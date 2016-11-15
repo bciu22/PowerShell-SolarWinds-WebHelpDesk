@@ -61,8 +61,7 @@ Function Invoke-WHDRESTMethod
     param(
         $EndpointURL,
         $Method = "GET",
-        $PageNumber=0,
-        $PageSize=0,
+        $Page=1,
         [System.Collections.Hashtable]
         $Parameters=@{}
     )
@@ -94,9 +93,8 @@ Function Invoke-WHDRESTMethod
     {
         throw "WHDURL Required"
     }
-
+    $parameters.page=$Page
     $URI = "$($(Get-Variable -Name "WHDURL").Value)/helpdesk/WebObjects/Helpdesk.woa/ra/$($EndpointURL)"
-   
     $parameterString = ($Parameters.GetEnumerator() | % { "$($_.Key)=$($_.Value)" }) -join '&'
     if ($parameterString)
     {
@@ -114,27 +112,47 @@ function Get-WHDTicket
         [ValidateSet('mine','group','flagged','recent')]
         $TicketList="mine",
         $RequestTypePartialName,
+        $TicketStatusType,
         $QualifierString
     )
+
+    $parameters=@{}
     if ($ticketNumber)
     {
-        $responses= Invoke-WHDRESTMethod -EndpointURL "Tickets/$($ticketNumber)"
+        $URI = "Tickets/$($ticketNumber)"
     }
-    elseif ($RequestTypePartialName)
+    elseif ($RequestTypePartialName -or $TicketStatusType)
     {
-        $parameters=@{}
-        $parameters.qualifier= $([System.Web.HttpUtility]::UrlEncode("(problemtype.problemTypeName caseInsensitiveLike '$RequestTypePartialName')"))
-        $responses= Invoke-WHDRESTMethod -EndpointURL "Tickets" -Parameters $parameters
+       
+        $QualifierStrings = @()
+        $QualifierStrings += $([System.Web.HttpUtility]::UrlEncode("(problemtype.problemTypeName caseInsensitiveLike '$RequestTypePartialName')"))
+        $QualifierStrings += $([System.Web.HttpUtility]::UrlEncode("(statustype.statusTypeName caseInsensitiveLike '$TicketStatusType')"))
+        $parameters.qualifier= $QualifierStrings -join "and"
+        $URI = "Tickets"
     }
     elseif ($QualifierString)
     {
-        $parameters=@{}
         $parameters.qualifier= $([System.Web.HttpUtility]::UrlEncode($QualifierString))
-        $responses= Invoke-WHDRESTMethod -EndpointURL "Tickets" -Parameters $parameters
+        $URI = "Tickets"
     }
     else {
-        $responses= Invoke-WHDRESTMethod -EndpointURL "Tickets/$($ticketList)"
+        $URI =  "Tickets/$($ticketList)" 
     }
+
+    $responses=@()
+    $page = 1;
+    $hasMore = $true
+    while($hasMore)
+    {
+        $temp = Invoke-WHDRESTMethod -EndpointURL $URI -Parameters $parameters -Page $page
+        if ($temp -isnot [system.array] -or $temp.count -eq 0 )
+        {
+            $hasMore = $false
+        }
+        $responses+=$temp
+        $page += 1 
+    }
+
 
      foreach($ticket in $responses ) 
     {
@@ -142,9 +160,7 @@ function Get-WHDTicket
         {
             $ticket = Get-WHDTicket -TicketNumber $ticket.id
         }
-        
         $ticket
-
     }
 }
 
@@ -174,4 +190,9 @@ Function Get-WHDClient
     $parameters.qualifier =$([System.Web.HttpUtility]::UrlEncode( "(email caseInsensitiveLike '$UserName')"))
     
     Invoke-WHDRESTMethod -EndpointURL "Clients" -Parameters $parameters
+}
+
+Function Get-WHDStatusTypes
+{
+      Invoke-WHDRESTMethod -EndpointURL "StatusTypes"
 }
