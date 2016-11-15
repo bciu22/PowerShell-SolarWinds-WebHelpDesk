@@ -102,17 +102,8 @@ Function Invoke-WHDRESTMethod
     {
         $URI +="?$($parameterString)"
     }
-    $responses = Invoke-RestMethod -uri $URI -Method $Method
-    foreach($ticket in $responses ) 
-    {
-        if ($ticket.shortDetail)
-        {
-            Get-WHDTicket -TicketNumber $ticket.id
-        }
-        else {
-            $ticket
-        }
-    }
+    Invoke-RestMethod -uri $URI -Method $Method
+    
     
 }
 
@@ -127,22 +118,33 @@ function Get-WHDTicket
     )
     if ($ticketNumber)
     {
-        Invoke-WHDRESTMethod -EndpointURL "Tickets/$($ticketNumber)"
+        $responses= Invoke-WHDRESTMethod -EndpointURL "Tickets/$($ticketNumber)"
     }
     elseif ($RequestTypePartialName)
     {
         $parameters=@{}
         $parameters.qualifier= $([System.Web.HttpUtility]::UrlEncode("(problemtype.problemTypeName caseInsensitiveLike '$RequestTypePartialName')"))
-        Invoke-WHDRESTMethod -EndpointURL "Tickets" -Parameters $parameters
+        $responses= Invoke-WHDRESTMethod -EndpointURL "Tickets" -Parameters $parameters
     }
     elseif ($QualifierString)
     {
         $parameters=@{}
         $parameters.qualifier= $([System.Web.HttpUtility]::UrlEncode($QualifierString))
-        Invoke-WHDRESTMethod -EndpointURL "Tickets" -Parameters $parameters
+        $responses= Invoke-WHDRESTMethod -EndpointURL "Tickets" -Parameters $parameters
     }
     else {
-        Invoke-WHDRESTMethod -EndpointURL "Tickets/$($ticketList)"
+        $responses= Invoke-WHDRESTMethod -EndpointURL "Tickets/$($ticketList)"
+    }
+
+     foreach($ticket in $responses ) 
+    {
+        if ($ticket.shortDetail)
+        {
+            $ticket = Get-WHDTicket -TicketNumber $ticket.id
+        }
+        
+        $ticket
+
     }
 }
 
