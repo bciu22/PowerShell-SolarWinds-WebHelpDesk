@@ -46,7 +46,6 @@ function Connect-WHDService {
         throw "APIKey or Password required"
     }
 
-    Write-Host $URI
     $Response = Invoke-RestMethod -Uri $URI  -Method GET
     Set-Variable -Scope Global -Name "WHDURL" -Value $WHDURL
     Set-Variable -Scope Global -Name "WHDSessionKey" -Value $Response.sessionKey
@@ -76,13 +75,13 @@ Function Invoke-WHDRESTMethod
             throw "WHDUsername required"
         }
 
-        if (test-path variable:global:"WHDapikey")
+        if ((test-path variable:global:"WHDapikey") -and -not ([string]::IsNullOrEmpty($($(Get-Variable -Name "WHDapikey").value))))
         {
             $Parameters.apiKey=$($(Get-Variable -Name "WHDapikey").value)
         }
         elseif (test-path variable:global:"WHDPassword") 
         {
-            $Parameters.password=$($(Get-Variable -Name "WHDPassword" -).value)
+            $Parameters.password=$($(Get-Variable -Name "WHDPassword").value)
         }
         else 
         {
@@ -100,6 +99,7 @@ Function Invoke-WHDRESTMethod
     {
         $URI +="?$($parameterString)"
     }
+    write-host $URI
     Invoke-RestMethod -uri $URI -Method $Method
     
     
@@ -113,7 +113,8 @@ function Get-WHDTicket
         $TicketList="mine",
         $RequestTypePartialName,
         $TicketStatusType,
-        $QualifierString
+        $QualifierString,
+        $limit =10
     )
 
     $parameters=@{}
@@ -142,7 +143,7 @@ function Get-WHDTicket
     $responses=@()
     $page = 1;
     $hasMore = $true
-    while($hasMore)
+    while($hasMore -and $responses.count -lt $limit)
     {
         $temp = Invoke-WHDRESTMethod -EndpointURL $URI -Parameters $parameters -Page $page
         if ($temp -isnot [system.array] -or $temp.count -eq 0 )
